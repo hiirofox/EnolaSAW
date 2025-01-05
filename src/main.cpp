@@ -1,37 +1,30 @@
-﻿#include <GLFW/glfw3.h>  // 引入 GLFW 头文件
+﻿#include "waveout.h"
 
-int main() {
-    // 初始化 GLFW
-    if (!glfwInit()) {
-        return -1; // 如果初始化失败，返回错误码
-    }
+#define _USE_MATH_DEFINES
+#include <math.h>
 
-    // 创建一个窗口ed模式的窗口
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Hello GLFW", nullptr, nullptr);
-    if (!window) {
-        glfwTerminate();  // 创建窗口失败，终止 GLFW
-        return -1;
-    }
+#define BufferNumSamples 256
 
-    // 将窗口的上下文设置为当前的 OpenGL 上下文
-    glfwMakeContextCurrent(window);
+float bufl[BufferNumSamples];
+float bufr[BufferNumSamples];
 
-    // 主循环，直到窗口被关闭
-    while (!glfwWindowShouldClose(window)) {
-        // 渲染背景色为黑色
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        // 交换缓冲区，显示渲染内容
-        glfwSwapBuffers(window);
-
-        // 处理窗口事件
-        glfwPollEvents();
-    }
-
-    // 终止 GLFW
-    glfwDestroyWindow(window);
-    glfwTerminate();
-
-    return 0;
+WaveOut wo;
+int main()
+{
+	wo.Init();
+	wo.Start();
+	int sampleRate = wo.GetSampleRate();
+	float t = 0;
+	float dt = 440.0 / sampleRate;
+	for (;;)
+	{
+		for (int i = 0; i < BufferNumSamples; ++i)
+		{
+			bufl[i] = cosf(t * 2.0 * M_PI);
+			bufr[i] = cosf(t * 2.0 * M_PI);
+			t += dt;
+			t -= (int)t;
+		}
+		wo.FillBuffer(bufl, bufr, BufferNumSamples);
+	}
 }
