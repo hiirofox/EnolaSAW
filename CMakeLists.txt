@@ -10,6 +10,7 @@ link_directories(${WINDOWS_SDK_LIB_PATH})
 add_executable(EnolaSAW 
     src/main.cpp 
     src/waveout.cpp
+    src/dbg.cpp
 )
 
 add_subdirectory(external/glfw-3.4)

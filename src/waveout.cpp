@@ -1,4 +1,5 @@
 #include "waveout.h"
+#include "dbg.h"
 
 template <typename T>
 void WaveOut::_FillBuffer(const float* bufferL, const float* bufferR, int numSamples) {}
@@ -7,21 +8,21 @@ void WaveOut::_FillBuffer<float>(const float* bufferL, const float* bufferR, int
 {
 	BYTE* buffer = NULL;
 	while (buffer == NULL)hr = renderService->GetBuffer(numSamples, &buffer);
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 	for (int i = 0, j = 0; i < numSamples; ++i, j += 2)
 	{
 		((float*)buffer)[j + 0] = bufferL[i];
 		((float*)buffer)[j + 1] = bufferR[i];
 	}
 	hr = renderService->ReleaseBuffer(numSamples, 0);
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 }
 template <>
 void WaveOut::_FillBuffer<int16_t>(const float* bufferL, const float* bufferR, int numSamples)
 {
 	BYTE* buffer = NULL;
 	while (buffer == NULL)hr = renderService->GetBuffer(numSamples, &buffer);
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 	const float ToInt16 = (1 << 15);//没有limit，损失音量为代价，小心别爆
 	for (int i = 0; i < numSamples << 1; i += 2)
 	{
@@ -29,13 +30,13 @@ void WaveOut::_FillBuffer<int16_t>(const float* bufferL, const float* bufferR, i
 		((int16_t*)buffer)[i + 1] = bufferR[i] * ToInt16;
 	}
 	hr = renderService->ReleaseBuffer(numSamples, 0);
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 }
 
 WaveOut::WaveOut()
 {
 	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 
 	hr = CoCreateInstance(
 		CLSID_MMDeviceEnumerator,
@@ -44,20 +45,20 @@ WaveOut::WaveOut()
 		IID_IMMDeviceEnumerator,
 		(void**)&enumerator
 	);
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 
 
 	hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &renderer);
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 
 	hr = enumerator->Release();
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 
 	hr = renderer->Activate(IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&renderClient);
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 
 	hr = renderClient->GetMixFormat(&format);//共享模式的format是固定的
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 
 	printf("SampleRate:%d\n", format->nSamplesPerSec);
 	printf("Channel:%d\n", format->nChannels);
@@ -72,16 +73,16 @@ WaveOut::~WaveOut()
 void WaveOut::Init()//共享模式改不了采样率，将就用吧
 {
 	hr = renderClient->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, 1 << 24, 0, format, NULL);
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 
 	hr = renderClient->GetService(IID_IAudioRenderClient, (void**)&renderService);
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 }
 
 void WaveOut::Start()
 {
 	hr = renderClient->Start();
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 }
 
 int WaveOut::GetSampleRate()
@@ -98,7 +99,7 @@ void WaveOut::FillBuffer(const float* bufferL, const float* bufferR, int numSamp
 void WaveOut::Stop()
 {
 	hr = renderClient->Stop();
-	assert(SUCCEEDED(hr));
+	HResultCheckFailed(hr);
 }
 void WaveOut::Close()
 {
