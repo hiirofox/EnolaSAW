@@ -11,6 +11,9 @@ add_executable(EnolaSAW
     src/main.cpp 
     src/waveout.cpp
     src/dbg.cpp
+    src/component.cpp
+    src/window.cpp
+    src/timer.cpp
 )
 
 add_subdirectory(external/glfw-3.4)
