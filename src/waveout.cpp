@@ -1,5 +1,7 @@
 #include "waveout.h"
 #include "dbg.h"
+#include <chrono>
+#include <thread>
 
 template <typename T>
 void WaveOut::_FillBuffer(const float* bufferL, const float* bufferR, int numSamples) {}
@@ -7,7 +9,12 @@ template <>
 void WaveOut::_FillBuffer<float>(const float* bufferL, const float* bufferR, int numSamples)
 {
 	BYTE* buffer = NULL;
-	while (buffer == NULL)hr = renderService->GetBuffer(numSamples, &buffer);
+	for (;;)
+	{
+		hr = renderService->GetBuffer(numSamples, &buffer);
+		if (buffer != NULL)break;
+		std::this_thread::sleep_for(std::chrono::nanoseconds(10)); // 解决了，cpu占用异常的问题
+	}
 	HResultCheckFailed(hr);
 	for (int i = 0, j = 0; i < numSamples; ++i, j += 2)
 	{
@@ -21,7 +28,12 @@ template <>
 void WaveOut::_FillBuffer<int16_t>(const float* bufferL, const float* bufferR, int numSamples)
 {
 	BYTE* buffer = NULL;
-	while (buffer == NULL)hr = renderService->GetBuffer(numSamples, &buffer);
+	for (;;)
+	{
+		hr = renderService->GetBuffer(numSamples, &buffer);
+		if (buffer != NULL)break;
+		std::this_thread::sleep_for(std::chrono::nanoseconds(10)); // 解决了，cpu占用异常的问题
+	}
 	HResultCheckFailed(hr);
 	const float ToInt16 = (1 << 15);//没有limit，损失音量为代价，小心别爆
 	for (int i = 0; i < numSamples << 1; i += 2)
@@ -60,10 +72,10 @@ WaveOut::WaveOut()
 	hr = renderClient->GetMixFormat(&format);//共享模式的format是固定的
 	HResultCheckFailed(hr);
 
-	printf("SampleRate:%d\n", format->nSamplesPerSec);
-	printf("Channel:%d\n", format->nChannels);
-	printf("Bit:%d\n", format->wBitsPerSample);
-	printf("FrameSize:%d\n", format->nBlockAlign);
+	DBG("SampleRate:%d\n", format->nSamplesPerSec);
+	DBG("Channel:%d\n", format->nChannels);
+	DBG("Bit:%d\n", format->wBitsPerSample);
+	DBG("FrameSize:%d\n", format->nBlockAlign);
 }
 WaveOut::~WaveOut()
 {
@@ -72,7 +84,7 @@ WaveOut::~WaveOut()
 
 void WaveOut::Init()//共享模式改不了采样率，将就用吧
 {
-	hr = renderClient->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, 1 << 24, 0, format, NULL);
+	hr = renderClient->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, 1 << 19, 0, format, NULL);
 	HResultCheckFailed(hr);
 
 	hr = renderClient->GetService(IID_IAudioRenderClient, (void**)&renderService);
@@ -104,8 +116,8 @@ void WaveOut::Stop()
 void WaveOut::Close()
 {
 	renderClient->Stop();
-	renderService->Release();
-	renderClient->Release();
-	renderer->Release();
+	//renderService->Release();
+	//renderClient->Release();
+	//renderer->Release();
 	CoUninitialize();
 }
