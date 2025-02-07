@@ -11,247 +11,6 @@
 
 using namespace Enola;
 
-class MainComponent : public Window, public Component//主组件类，可以理解为把主窗口当成一个组件
-{
-private:
-
-	void CreateWindowCB(GLFWwindow* window) override
-	{
-		SetRootWindow(window);
-		SetBounds({ 0,0,GetWindowWidth(),GetWindowHeight() });
-	}
-	void ResizeWindowCB(int width, int height) override
-	{
-		SetBounds({ 0,0,width,height });
-		Resize();
-	}
-public:
-	MainComponent()
-	{
-
-	}
-	~MainComponent()
-	{
-
-	}
-};
-
-class AudioProcessor
-{
-private:
-	WaveOut wo;
-	std::thread audioThread;
-#define MaxNumSamplesOfBlock 4096	
-	int numSamples = 512;
-	float bufl[MaxNumSamplesOfBlock];
-	float bufr[MaxNumSamplesOfBlock];
-
-	int isClose = 0;
-protected:
-	void InitAudioProcessor()//waveout start
-	{
-		wo.Init();
-		wo.Start();
-		PrepareToPlay(wo.GetSampleRate(), numSamples);
-		audioThread = std::thread([this]() {
-			while (!isClose)
-			{
-				ProcessNextBlock(bufl, bufr, numSamples);
-				wo.FillBuffer(bufl, bufr, numSamples);
-			}
-			});
-	}
-	void CloseAudioProcessor()//waveout stop
-	{
-		isClose = 1;
-		if (audioThread.joinable())audioThread.join();
-		wo.Close();
-	}
-public:
-	AudioProcessor()
-	{
-		memset(bufl, 0, sizeof(bufl));
-		memset(bufr, 0, sizeof(bufr));
-	}
-	~AudioProcessor()
-	{
-		CloseAudioProcessor();
-	}
-	void SetNumSamplesOfBlock(int numSamplesOfBlock)
-	{
-		if (numSamplesOfBlock <= MaxNumSamplesOfBlock)
-		{
-			numSamples = numSamplesOfBlock;
-		}
-	}
-	virtual void PrepareToPlay(int sampleRate, int numSamplesOfBlock)
-	{
-		DBG("sampleRate:%d numSamplesOfBlock:%d\n", sampleRate, numSamplesOfBlock);
-	}
-	virtual void ProcessNextBlock(float* wavbufl, float* wavbufr, int numSamples)
-	{
-		DBG("ProcessNextBlock\n");
-	}
-};
-
-class EnolaAudioProcessor : public AudioProcessor
-{
-private:
-	float t = 0;
-	float dt = 440.0 / 48000;
-public:
-	void Init()
-	{
-		InitAudioProcessor();
-	}
-	void Close()
-	{
-		CloseAudioProcessor();
-	}
-	void PrepareToPlay(int sampleRate, int numSamplesOfBlock) override
-	{
-		DBG("EnolaAudioProcessor sampleRate:%d numSamplesOfBlock:%d\n", sampleRate, numSamplesOfBlock);
-	}
-	void ProcessNextBlock(float* wavbufl, float* wavbufr, int numSamples) override
-	{
-		for (int i = 0; i < numSamples; i++)
-		{
-			wavbufl[i] = sinf(t * 2.0 * M_PI) * 0.01;
-			wavbufr[i] = sinf(t * 2.0 * M_PI) * 0.01;
-			t += dt;
-			t -= (int)t;
-		}
-	}
-};
-
-class EnolaAudioProcessorEditor : public MainComponent
-{
-private:
-	std::thread RepaintThread;
-	int isClose = 1;
-public:
-	EnolaAudioProcessorEditor()
-	{
-	}
-	void StartAutoReflash()
-	{
-		RepaintThread = std::thread([this]() {
-			while (getWindow())
-			{
-				Repaint();
-				std::this_thread::sleep_for(std::chrono::milliseconds(16));
-			}
-			});
-	}
-	void Resize() override
-	{
-		DBG("Bounds:%d %d %d %d\n", GetBounds().x, GetBounds().y, GetBounds().width, GetBounds().height);
-	}
-	void Paint(Graphics& g) override
-	{
-		Enola::Rectangle rect = GetBounds();
-		DBG("Rect:%d %d %d %d\n", rect.x, rect.y, rect.width, rect.height);
-		for (int i = 0; i < 100; ++i)
-		{
-			g.SetColor(0xff00ff00);
-			g.DrawLine(rand() % 640, rand() % 480, rand() % 640, rand() % 480);
-		}
-	}
-	void Close() override
-	{
-		isClose = 1;
-	}
-};
-
-namespace test
-{
-	class Component
-	{
-	private:
-		std::vector<std::unique_ptr<Component>> childComponents;
-	protected:
-		void AddAndMakeVisable(Component& p)
-		{
-			childComponents.emplace_back(&p);
-			//todo
-		}
-	public:
-		virtual void Resize(int w, int h)
-		{
-		}
-		virtual void Paint(GLFWwindow* pwh)
-		{
-		}
-	};
-
-	std::mutex WndProcMtx;
-	class Window :public Component
-	{
-	private:
-		std::thread wndThread;
-		std::queue<std::function<void()>> tasks;
-		std::string name;
-		int width, height;
-		GLFWwindow* pWndHandle = NULL;
-
-		static void ResizeCallback(GLFWwindow* pWnd, int w, int h)
-		{
-			Window* my = (Window*)glfwGetWindowUserPointer(pWnd);
-			my->width = w;
-			my->height = h;
-			my->Resize(w, h);
-		}
-		void WndProc()
-		{
-			WndProcMtx.lock();
-			pWndHandle = glfwCreateWindow(width, height, name.c_str(), NULL, NULL);
-			if (!pWndHandle)
-			{
-				WndProcMtx.unlock();
-				return;
-			}
-			glfwSetWindowUserPointer(pWndHandle, this);
-			glfwSetWindowSizeCallback(pWndHandle, ResizeCallback);
-			WndProcMtx.unlock();
-
-			while (!glfwWindowShouldClose(pWndHandle))
-			{
-				WndProcMtx.lock();
-				glfwMakeContextCurrent(pWndHandle);
-				while (tasks.size())//外部传入线程内的任务
-				{
-					auto task = tasks.front();
-					tasks.pop();
-					task();
-				}
-				Paint(pWndHandle);
-				glfwSwapBuffers(pWndHandle);
-				glfwPollEvents();
-				WndProcMtx.unlock();
-				std::this_thread::sleep_for(std::chrono::microseconds(10));
-			}
-		}
-	public:
-		void Create(std::string& name, int width, int height)
-		{
-			glfwInit();
-			this->name = name;
-			this->width = width;
-			this->height = height;
-			wndThread = std::thread(&Window::WndProc, this);
-			Resize(width, height);
-		}
-		void TransTaskToThread(std::function<void()> func)
-		{
-			tasks.push(func);
-		}
-	};
-	class AppTest :public Window
-	{
-	private:
-	public:
-	};
-}
 
 // 立方体顶点数据（边长2，中心在原点）
 GLfloat vertices[][3] = {
@@ -284,7 +43,7 @@ GLfloat colors[][4] = {
 	{0.0f, 1.0f, 1.0f, 1.0f}, // 青
 	{1.0f, 0.0f, 1.0f, 1.0f}  // 紫
 };
-class app_cube :public test::Window
+class app_cube :public Window
 {
 private:
 	void drawCube() {
@@ -300,7 +59,7 @@ private:
 public:
 	void Resize(int w, int h) override
 	{
-		TransTaskToThread([w, h]() {
+		SendTaskToThread([w, h]() {
 			glEnable(GL_DEPTH_TEST);
 			glMatrixMode(GL_PROJECTION);
 			glLoadIdentity();
@@ -385,7 +144,7 @@ private:
 	}
 };
 
-class app_torus : public test::Window {
+class app_torus : public Window {
 private:
 	Torus torus;
 	float rotationAngle = 0.0f;
@@ -418,7 +177,7 @@ private:
 
 public:
 	void Resize(int w, int h) override {
-		TransTaskToThread([w, h, this]() {
+		SendTaskToThread([w, h, this]() {
 			glEnable(GL_DEPTH_TEST);
 			glEnable(GL_TEXTURE_1D);
 

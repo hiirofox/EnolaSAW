@@ -2,99 +2,77 @@
 
 #include <Windows.h>
 #include "glfw\glfw3.h"
+#include "component.h"
 #include "timer.h"
 #include "dbg.h"
 
 namespace Enola
 {
-	class Window  //这个只是一个基类，不推荐直接使用
+	static std::mutex WndProcMtx;
+	class Window :public Component
 	{
 	private:
-		int width = 0;
-		int height = 0;
+		std::thread wndThread;
+		std::queue<std::function<void()>> tasks;
+		std::string name;
+		int width, height;
+		GLFWwindow* pWndHandle = NULL;
 
-		static void FramebufferSizeCallback(GLFWwindow* window, int width, int height)
+		static void ResizeCallback(GLFWwindow* pWnd, int w, int h)
 		{
-			Window* win = static_cast<Window*>(glfwGetWindowUserPointer(window));
-			win->ResizeWindowCB(width, height);
-			win->width = width;
-			win->height = height;
+			Window* my = (Window*)glfwGetWindowUserPointer(pWnd);
+			my->width = w;
+			my->height = h;
+			my->Resize(w, h);
 		}
-
-		static void WindowCloseCallback(GLFWwindow* window)
+		void WndProc()
 		{
-			Window* win = static_cast<Window*>(glfwGetWindowUserPointer(window));
-			win->CloseWindowCB();
-		}
-
-		virtual void CreateWindowCB(GLFWwindow* window)
-		{
-
-		}
-		virtual void ResizeWindowCB(int width, int height)//为了MainComponent加的
-		{
-
-		}
-		void CloseWindowCB()
-		{
-			if (window)
+			WndProcMtx.lock();
+			pWndHandle = glfwCreateWindow(width, height, name.c_str(), NULL, NULL);
+			if (!pWndHandle)
 			{
-				Close();
-				glfwDestroyWindow(window);
-				window = NULL;
+				WndProcMtx.unlock();
+				return;
+			}
+			glfwSetWindowUserPointer(pWndHandle, this);
+			glfwSetWindowSizeCallback(pWndHandle, ResizeCallback);
+			WndProcMtx.unlock();
+
+			while (!glfwWindowShouldClose(pWndHandle))
+			{
+				WndProcMtx.lock();
+				glfwMakeContextCurrent(pWndHandle);
+				while (tasks.size())//外部传入线程内的任务
+				{
+					auto task = tasks.front();
+					tasks.pop();
+					task();
+				}
+				Paint(pWndHandle);
+				glfwSwapBuffers(pWndHandle);
+				WndProcMtx.unlock();
+				glfwPollEvents();//因为这个是自己线程的所以可以丢外面做
+				std::this_thread::sleep_for(std::chrono::microseconds(10));
 			}
 		}
-	protected:
-		GLFWwindow* window = NULL;
 	public:
-		Window()
+		void Create(std::string& name, int width, int height)
 		{
-		}
-		~Window()
-		{
-		}
-		GLFWwindow* getWindow()
-		{
-			return window;
-		}
-		void Create(int width, int height, const char* title)//一个Window只能创建一个窗口
-		{
-			window = glfwCreateWindow(width, height, title, NULL, NULL);
-			if (!window)
-			{
-				glfwTerminate();
-				DBG("glfwCreateWindow failed\n");
-				while (1);
-			}
-			glfwSetWindowUserPointer(window, this);
-			glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
-			glfwSetWindowCloseCallback(window, WindowCloseCallback);
-			CreateWindowCB(window);
+			glfwInit();
+			this->name = name;
 			this->width = width;
 			this->height = height;
+			wndThread = std::thread(&Window::WndProc, this);
+			Resize(width, height);
 		}
-
-		int GetWindowWidth()
+		void SendTaskToThread(std::function<void()> func)
 		{
-			return width;
+			tasks.push(func);
 		}
-		int GetWindowHeight()
-		{
-			return height;
-		}
-
-		void UpdataWindowEvent()//幸苦一下了，在main循环里调用这个
-		{
-			if (window)
-			{
-				glfwMakeContextCurrent(window);
-				glfwPollEvents();
-			}
-		}
-
-		virtual void Close()//如果窗口关闭，这个会被调用
-		{
-			DBG("closeWindow\n");
-		}
+	};
+	class AppTest :public Window
+	{
+	private:
+	public:
 	};
 }

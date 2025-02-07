@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(EnolaSAW)
 
 #set(CMAKE_CXX_FLAGS_DEBUG "-Og /MD")
-set(CMAKE_CXX_FLAGS_RELEASE "-OFast /MD")
+set(CMAKE_CXX_FLAGS_RELEASE "-Ofast /MD")
 
 set(CMAKE_CXX_STANDARD 17)
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -25,3 +25,4 @@ if(OPENGL_FOUND)
 else()
     message(FATAL_ERROR "OpenGL not found!")
 endif()
+
