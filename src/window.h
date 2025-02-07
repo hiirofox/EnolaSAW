@@ -17,13 +17,33 @@ namespace Enola
 		std::string name;
 		int width, height;
 		GLFWwindow* pWndHandle = NULL;
+		MouseMsg mousemsg;
 
 		static void ResizeCallback(GLFWwindow* pWnd, int w, int h)
 		{
 			Window* my = (Window*)glfwGetWindowUserPointer(pWnd);
-			my->width = w;
+			my->width = w;//windowÀà
 			my->height = h;
+			my->SetBounds({ 0,0, w, h });
 			my->Resize(w, h);
+		}
+		static void MouseButtonCallback(GLFWwindow* pWnd, int button, int action, int mods)
+		{
+			Window* my = (Window*)glfwGetWindowUserPointer(pWnd);
+			glfwMakeContextCurrent(pWnd);
+			glfwGetCursorPos(pWnd, &my->mousemsg.x, &my->mousemsg.y);
+			my->mousemsg.button = button;
+			my->mousemsg.action = action;
+			my->mousemsg.mods = mods;
+			my->MouseMsgCallbackProc(my->mousemsg);
+		}
+		static void CursorCallback(GLFWwindow* pWnd, double x, double y)
+		{
+			Window* my = (Window*)glfwGetWindowUserPointer(pWnd);
+			glfwMakeContextCurrent(pWnd);
+			glfwGetCursorPos(pWnd, &my->mousemsg.x, &my->mousemsg.y);
+			my->mousemsg.action = -1;
+			my->MouseMsgCallbackProc(my->mousemsg);
 		}
 		void WndProc()
 		{
@@ -34,8 +54,11 @@ namespace Enola
 				WndProcMtx.unlock();
 				return;
 			}
+			glfwMakeContextCurrent(pWndHandle);
 			glfwSetWindowUserPointer(pWndHandle, this);
 			glfwSetWindowSizeCallback(pWndHandle, ResizeCallback);
+			glfwSetMouseButtonCallback(pWndHandle, MouseButtonCallback);
+			glfwSetCursorPosCallback(pWndHandle, CursorCallback);
 			WndProcMtx.unlock();
 
 			while (!glfwWindowShouldClose(pWndHandle))
@@ -63,6 +86,7 @@ namespace Enola
 			this->width = width;
 			this->height = height;
 			wndThread = std::thread(&Window::WndProc, this);
+			SetBounds({ 0,0, width, height });
 			Resize(width, height);
 		}
 		void SendTaskToThread(std::function<void()> func)
