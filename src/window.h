@@ -24,8 +24,9 @@ namespace Enola
 			Window* my = (Window*)glfwGetWindowUserPointer(pWnd);
 			my->width = w;//windowÀà
 			my->height = h;
-			my->SetBounds({ 0,0, w, h });
-			my->Resize(w, h);
+			Rectangle windowRect = { 0,0, w, h };
+			my->SetBounds(windowRect);
+			my->ResizeCallbackProc(windowRect, { 0,0 });
 		}
 		static void MouseButtonCallback(GLFWwindow* pWnd, int button, int action, int mods)
 		{
@@ -87,7 +88,7 @@ namespace Enola
 			this->height = height;
 			wndThread = std::thread(&Window::WndProc, this);
 			SetBounds({ 0,0, width, height });
-			Resize(width, height);
+			Resize({ 0,0,width,height });
 		}
 		void SendTaskToThread(std::function<void()> func)
 		{

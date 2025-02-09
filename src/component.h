@@ -11,6 +11,10 @@ namespace Enola
 {
 	typedef struct
 	{
+		int x, y;
+	}Positive;
+	typedef struct
+	{
 		int x, y, w, h;
 	}Rectangle;
 	typedef struct
@@ -23,9 +27,18 @@ namespace Enola
 	{
 	private:
 		std::vector<std::unique_ptr<Component>> childComponents;
+		Positive parentPos;
 		Rectangle myBounds;
-		//todo bounds的xy是相对的
 	protected:
+		void ResizeCallbackProc(Rectangle& windowRect, Positive nowPos)
+		{
+			parentPos = nowPos;
+			Resize(windowRect);//先给parent控件设置完，再传递给子控件
+			for (auto& child : childComponents)
+			{
+				child->ResizeCallbackProc(windowRect, { nowPos.x + myBounds.x,nowPos.y + myBounds.y });
+			}
+		}
 		int MouseMsgCallbackProc(MouseMsg& msg)//鼠标事件是一层层往上传（传给child），如果无人认领就是自己的了。
 		{
 			int flag = 0;
@@ -37,11 +50,13 @@ namespace Enola
 				}
 			}
 			if (flag == 1)return 1;//有人要了就润
+			int rx = parentPos.x + myBounds.x;
+			int ry = parentPos.x + myBounds.x;
 			if (
-				msg.x >= myBounds.x &&
-				msg.y >= myBounds.y &&
-				msg.x <= myBounds.x + myBounds.w &&
-				msg.y < myBounds.y + myBounds.h)//没人要就看看是不是自己的，是就要
+				msg.x >= rx &&
+				msg.y >= ry &&
+				msg.x <= rx + myBounds.w &&
+				msg.y < ry + myBounds.h)//没人要就看看是不是自己的，是就要
 			{
 				//todo 处理鼠标事件回调
 				//当然，也可以做一些选项，即无视上层控件阻挡
@@ -59,7 +74,7 @@ namespace Enola
 		{
 			myBounds = bounds;
 		}
-		virtual void Resize(int w, int h)
+		virtual void Resize(Rectangle windowRect)
 		{
 		}
 		virtual void Paint(GLFWwindow* pwh)

@@ -57,8 +57,9 @@ private:
 		}
 	}
 public:
-	void Resize(int w, int h) override
-	{
+	void Resize(Enola::Rectangle windowRect) override {
+		int w = windowRect.w;
+		int h = windowRect.h;
 		SendTaskToThread([w, h]() {
 			glEnable(GL_DEPTH_TEST);
 			glMatrixMode(GL_PROJECTION);
@@ -176,7 +177,10 @@ private:
 	}
 
 public:
-	void Resize(int w, int h) override {
+	void Resize(Enola::Rectangle windowRect) override {
+		int w = windowRect.w;
+		int h = windowRect.h;
+
 		SendTaskToThread([w, h, this]() {
 			glEnable(GL_DEPTH_TEST);
 			glEnable(GL_TEXTURE_1D);
